@@ -1,0 +1,6 @@
+connection.txt
+password.txt
+username.txt
+venv/
+whereIsItem.py
+*.pyc
