@@ -8,11 +8,10 @@ http://amzn.to/1LGWsLG
 """
 
 from __future__ import print_function
-import requests
-#from whereisitem import find_location
 from dbtest import Connection
 
-connection = None
+#connection = None
+connection = Connection('connection.txt')
 
 # --------------- Helpers that build all of the responses ----------------------
 
@@ -114,32 +113,20 @@ def get_location_from_session(intent, session):
     # look up in the database
     item = intent['slots']['Item']['value']
 
-    # TODO: 
-    location = connnection.find_location(item)
-    #location = find_location(item)
-    
-    speech_output = item + " is located in " + location
-    should_end_session = True
-   
+    # TODO: success -> end, fail -> fail message
+    res = connection.find_location(item)
+    if res[0] == 1:
+        location = res[1]
+        #location = connection.find_location(item)
+        speech_output = item + " is located in " + location
+        should_end_session = True
+    else:
+        speech_output = res[1]
     # Setting reprompt_text to None signifies that we do not want to reprompt
     # the user. If the user does not respond or says something that is not
     # understood, the session will end.
     return build_response(session_attributes, build_speechlet_response(
         intent['name'], speech_output, reprompt_text, should_end_session))
-
-def test_session(intent, session):
-    # TODO: test after deploying
-    session_attributes = {}
-    reprompt_text = None
-
-    item = intent['slots']['Item']['value']
-    speech_output = "test item" + item
-    should_end_session = True
-
-    return build_response(session_attributes, build_speechlet_response(
-        intent['name'], speech_output, reprompt_text, should_end_session))
-
-
 
 
 """    
@@ -238,7 +225,6 @@ def lambda_handler(event, context):
     #     raise ValueError("Invalid Application ID")
 
     # TODO: Connection class
-    connection = Connection('connection.txt')
 
     if event['session']['new']:
         on_session_started({'requestId': event['request']['requestId']},

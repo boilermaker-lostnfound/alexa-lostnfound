@@ -4,3 +4,11 @@ username.txt
 venv/
 whereIsItem.py
 *.pyc
+data/
+deploy/
+*.zip
+*.tar
+*.tar.gz
+tags
+query.txt
+test.py
