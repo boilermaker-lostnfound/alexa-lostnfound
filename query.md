@@ -53,7 +53,6 @@ WITH count(r) AS TOTAL_COUNT
 MATCH (i:Item{name:"Headphone"})-[r:LOCATED_AT]->(l:Location) 
 WITH (count(r)*1.0/ TOTAL_COUNT*1.0) AS Weight,l
 WITH collect({location: l.name, weight: Weight*1 }) AS itemResult
-
 > MATCH (i:Item{name:"Headphone"})-[r:HAS_CATEGORY]->(c:Category) 
 WITH c,itemResult
 MATCH (c)<-[]-()-[r:LOCATED_AT]->(:Location) 
