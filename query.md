@@ -6,8 +6,8 @@
 
 ## Scenario 2: Set location of an item
 * Add a item to a new location
-1. set all remaining relation between the item and all location to inactive ("active=0")
-2. create new active relation, even item and location doesnt exists in the database
+    1. set all remaining relation between the item and all location to inactive ("active=0")
+    2. create new active relation, even item and location doesnt exists in the database
 
 > MATCH (:Item{name:"Headphone"}) - [rel:LOCATED_AT] -> (:Location) SET rel.active=0
 
@@ -15,6 +15,7 @@
 
 * Add new location
 > MERGE (location:Location{name:"Bedroom Table"})
+
 * Add new item
 > MERGE (item:Item{name:"Headphone"})
 
@@ -53,6 +54,7 @@ WITH count(r) AS TOTAL_COUNT
 MATCH (i:Item{name:"Headphone"})-[r:LOCATED_AT]->(l:Location) 
 WITH (count(r)*1.0/ TOTAL_COUNT*1.0) AS Weight,l
 WITH collect({location: l.name, weight: Weight*1 }) AS itemResult
+
 > MATCH (i:Item{name:"Headphone"})-[r:HAS_CATEGORY]->(c:Category) 
 WITH c,itemResult
 MATCH (c)<-[]-()-[r:LOCATED_AT]->(:Location) 

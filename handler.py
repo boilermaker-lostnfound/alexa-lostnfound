@@ -74,80 +74,77 @@ def handle_session_end_request():
     return build_response({}, build_speechlet_response(
         card_title, speech_output, None, should_end_session))
 
+def literal_test_in_session(intent, session):
+    session_attributes = {}
+    should_end_session = True
 
+    literal = intent['slots']['Literal']['value']
+    res = connection.literal_test(literal)
+    speech_output = res
+    reprompt_text = None
+    return build_response(session_attributes, build_speechlet_response(
+        intent['name'], speech_output, reprompt_text, should_end_session))
 
-# don't use yet
 def set_location_in_session(intent, session):
-    """ Sets the color in the session and prepares the speech to reply to the
-    user.
+    """ Add an item to a new location.
     """
 
-    card_title = intent['name']
     session_attributes = {}
-    should_end_session = False
+    should_end_session = True
 
-    if 'Item' in intent['slots']:
-        favorite_color = intent['slots']['Color']['value']
-        session_attributes = create_favorite_color_attributes(favorite_color)
-        speech_output = "I now know your favorite color is " + \
-                        favorite_color + \
-                        ". You can ask me your favorite color by saying, " \
-                        "what's my favorite color?"
-        reprompt_text = "You can ask me your favorite color by saying, " \
-                        "what's my favorite color?"
-    else:
-        speech_output = "I'm not sure what your favorite color is. " \
-                        "Please try again."
-        reprompt_text = "I'm not sure what your favorite color is. " \
-                        "You can tell me your favorite color by saying, " \
-                        "my favorite color is red."
-    return build_response(session_attributes, build_speechlet_response(
-        card_title, speech_output, reprompt_text, should_end_session))
-
-
-# use this one
-def get_location_from_session(intent, session):
-    session_attributes = {}
+    item = intent['slots']['Item']['value']
+    location = intent['slots']['Location']['value']
+    res = connection.set_location(item, location)
+    speech_output = item + " is now located in " + location
     reprompt_text = None
 
-    # look up in the database
+#    if 'Item' in intent['slots']:
+#        session_attributes = create_favorite_color_attributes(favorite_color)
+#        speech_output = "I now know your favorite color is " + \
+#                        favorite_color + \
+#                        ". You can ask me your favorite color by saying, " \
+#                        "what's my favorite color?"
+#        reprompt_text = "You can ask me your favorite color by saying, " \
+#                        "what's my favorite color?"
+#    else:
+#        speech_output = "I'm not sure what your favorite color is. " \
+#                        "Please try again."
+#        reprompt_text = "I'm not sure what your favorite color is. " \
+#                        "You can tell me your favorite color by saying, " \
+#                        "my favorite color is red."
+    return build_response(session_attributes, build_speechlet_response(
+        intent['name'], speech_output, reprompt_text, should_end_session))
+
+
+def get_location_from_session(intent, session):
+    """Get location name with item name
+    """
+    session_attributes = {}
+
+    # item_name
     item = intent['slots']['Item']['value']
 
-    # TODO: success -> end, fail -> fail message
     res = connection.find_location(item)
     if res[0] == 1:
         location = res[1]
-        #location = connection.find_location(item)
         speech_output = item + " is located in " + location
+        # TODO: should end =false --> reprompt: have more to ask?
         should_end_session = True
+        reprompt_text = None
+        # TODO: right place to call the beeper? do we need thread?
+        connection.find_location_beep(item)
     else:
-        speech_output = res[1]
+        # couldn't find it
+        speech_output = res[1] # No item named 'item'. 
+        # TODO: shouldend=false --> reprompt: Please try again...
+        should_end_session = True
+        reprompt_text = None
     # Setting reprompt_text to None signifies that we do not want to reprompt
     # the user. If the user does not respond or says something that is not
     # understood, the session will end.
     return build_response(session_attributes, build_speechlet_response(
         intent['name'], speech_output, reprompt_text, should_end_session))
 
-
-"""    
-    #========#
-
-    if session.get('attributes', {}) and "favoriteColor" in session.get('attributes', {}):
-        favorite_color = session['attributes']['favoriteColor']
-        speech_output = "Your favorite color is " + favorite_color + \
-                        ". Goodbye."
-        should_end_session = True
-    else:
-        speech_output = "I'm not sure what your favorite color is. " \
-                        "You can say, my favorite color is red."
-        should_end_session = False
-
-    # Setting reprompt_text to None signifies that we do not want to reprompt
-    # the user. If the user does not respond or says something that is not
-    # understood, the session will end.
-    return build_response(session_attributes, build_speechlet_response(
-        intent['name'], speech_output, reprompt_text, should_end_session))
-"""
 
 # --------------- Events ------------------
 
@@ -184,8 +181,8 @@ def on_intent(intent_request, session):
         return get_location_from_session(intent, session)
     if intent_name == "SetLocation":
         return set_location_in_session(intent, session)
-    if intent_name == "Test":
-        return test_session(intent, session)
+    if intent_name == "LiteralTest":
+        return literal_test_in_session(intent, session)
     # not using this intent
     elif intent_name == "AMAZON.HelpIntent":
         return get_welcome_response()
