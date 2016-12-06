@@ -18,14 +18,13 @@ class Connection:
         return self.gdb
 
     def iotconfig(self):
-        os.environ['AWS_CONFIG_FILE'] = '~/.aws/config'
+        os.environ['AWS_CONFIG_FILE'] = './.aws/config'
         self.iotclient = boto3.client('iot-data')
 
     # not planning to use
     def literal_test(self, literal):
         return "input voice is " + literal
 
-    # item name -> find location name
     # return: (code, message to read)
     def find_location(self, item_name='Backpack'):
         item_name = item_name.capitalize()
@@ -35,13 +34,21 @@ class Connection:
         #    else: return msg('the item was l.name t-now seconds ago. not now')
         # else:
         #    return l.name
-        query = """match (n:Item {name:"%s"})-[r:LOCATED_AT {active:"1"}]->(l:Location) return l.name""" % item_name
+        query = """match (n:Item {name:"%s"})-[r:LOCATED_AT ]->(l:Location) return l.name""" % item_name
+#        query = """
+#        match (item:Item{name:"%s"})-[r1:LOCATED_AT{active:1}]->(location:Location) 
+#        optional match (tag:NFCTag)-[r2:CONNECTED_TO]->(item) 
+#        optional match (:RaspberryPi)-[:PLACED_AT]->(location) 
+#        return location.name as location, (1480975071 - toInt(r1.timestamp)) as timecap, (case when tag is null then false else true end) as nfc_connected
+#        """
         results = self.gdb.query(query, returns=(str))
-        #print(results.elements) #[['Office Table']]
+        print(results.elements) #[['Office Table']]
+
         location_name =''
         if len(results) > 0:
             print(results[0])
             location_name = str(results[0][0])
+            print(location_name)
         else:
             # cannot find the item
             print('No item named %s' % item_name)
@@ -97,22 +104,17 @@ class Connection:
             results = self.gdb.query(query)
             return (1, 'Succeeded. ')
 
-#    #under developing
-#    def recommend_by_item:
-#        query = """  """
-#        results = self.gdb.query(query)
-#
-#    def recommend_by_item_timestamp:
-#        query = """  """
-#        results = self.gdb.query(query)
-#
-#    def recommend_by_item_category:
-#        query = """  """
-#        results = self.gdb.query(query)
-#
-#    def recommend_by_item_category_weight:
-#        query = """  """
-#        results = self.gdb.query(query)
+    def get_recommendation(self, item_name):
+        item_name = item_name.capitalize()
+        query = """
+        MATCH (i:Item{name:"%s"})-[r:LOCATED_AT]->(l:Location) 
+        WITH count(r) AS TOTAL_COUNT
+        MATCH (i:Item{name:"%s"})-[r:LOCATED_AT]->(l:Location) 
+        RETURN l.name AS Location, (count(r)*1.0/ TOTAL_COUNT*1.0) AS Weight
+        ORDER BY Weight DESC
+        """%(item_name, item_name)
+        results = self.gdb.query(query)
+        return results[0][0]
 
     def get_categories(self):
         query = """MATCH (c:Category) return c.name"""
@@ -132,11 +134,8 @@ class Connection:
 if __name__ == "__main__":
     conn = Connection('connection.txt')
     conn.iotconfig()
-    #res = conn.find_location('pencil')
-    #res = conn.find_location_beep()
-    #conn.find_location_beep()
-#    lst=conn.get_categories()
-#    print lst
-#    print(', '.join(lst))
-    #conn.set_location('Headphone', 'Bedroom Table')
-    conn.set_category('Key', 'Electronics')
+    res = conn.find_location('phone')
+    res = conn.find_location_beep()
+    conn.find_location_beep()
+    conn.set_location('Headphone', 'Bedroom Table')
+    conn.get_recommendation('Headphone')

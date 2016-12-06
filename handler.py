@@ -55,11 +55,8 @@ def get_welcome_response():
 
     session_attributes = {}
     card_title = "Welcome"
-    speech_output = "Welcome to Lost and Found. " #\
-                    #"Please ask me the location of your item by saying, " \
-                    #"where is my laptop."
-    # If the user either does not reply to the welcome message or says something
-    # that is not understood, they will be prompted again with this text.
+    speech_output = "Welcome to Lost and Found. " \
+            "What are you looking for?"
     reprompt_text = "Please ask me the location of your item by saying, " \
                     "where is my laptop."
     should_end_session = False
@@ -97,27 +94,13 @@ def set_location_in_session(intent, session):
 
     item = intent['slots']['Item']['value']
     location = intent['slots']['Location']['value']
-#    if 'next_task' in session['attributes'] \
-#            and session['attributes']['next_task'] == 'set_location':
-#        item = session['attributes']['item_name']
+    if 'next_task' in session['attributes'] \
+            and session['attributes']['next_task'] == 'set_location':
+        item = session['attributes']['item_name']
     res = connection.set_location(item, location)
     speech_output = item + " is now located in " + location
     reprompt_text = None
 
-#    if 'Item' in intent['slots']:
-#        session_attributes = create_favorite_color_attributes(favorite_color)
-#        speech_output = "I now know your favorite color is " + \
-#                        favorite_color + \
-#                        ". You can ask me your favorite color by saying, " \
-#                        "what's my favorite color?"
-#        reprompt_text = "You can ask me your favorite color by saying, " \
-#                        "what's my favorite color?"
-#    else:
-#        speech_output = "I'm not sure what your favorite color is. " \
-#                        "Please try again."
-#        reprompt_text = "I'm not sure what your favorite color is. " \
-#                        "You can tell me your favorite color by saying, " \
-#                        "my favorite color is red."
     return build_response(session_attributes, build_speechlet_response(
         intent['name'], speech_output, reprompt_text, should_end_session))
 
@@ -126,8 +109,6 @@ def get_location_from_session(intent, session):
     """Get location name with item name
     """
     session_attributes = {}
-
-    # item_name
     item = intent['slots']['Item']['value']
 
     res = connection.find_location(item)
@@ -138,7 +119,9 @@ def get_location_from_session(intent, session):
         should_end_session = True
         reprompt_text = None
         # TODO: right place to call the beeper? do we need thread?
-        #connection.find_location_beep(item)
+        # res[1][0]: location, res[1][1]: time gap, res[1][2]: true or false
+        # if res[1][2] == True:
+            #connection.find_location_beep(item)
     else:
         # couldn't find it
         speech_output = res[1] # No item named 'item'. 
@@ -155,7 +138,7 @@ def add_location_in_session(intent, session):
     session_attributes = {}
     should_end_session = True
     reprompt_text = None
-    location = intent['slots']['Location']['value']
+    location = intent['slots']['Location']['value'].capitalize()
     res = connection.add_new_location(location)
     if res[0] == 1:
         speech_output = "Location " + location + " was added to the database."
@@ -175,8 +158,7 @@ def add_item_in_session(intent, session):
     if res[0] == 1:
         speech_output = "Item " + item + " was added to the database. " \
                         "What is the category? Please select a category among "\
-                        "Blah blah blah."
-                        #"%s." % categories_str
+                        "%s." % categories_str
         should_end_session = False
         reprompt_text = None
         session_attributes = {'next_task':'set_category', 'item_name': item}
@@ -189,8 +171,8 @@ def add_item_in_session(intent, session):
         intent['name'], speech_output, reprompt_text, should_end_session))
 
 def set_category_in_session(intent, session):
-    #item = session_attributes['item_name']
     if session['attributes']:
+        # TODO: should add condition if 'next_task' is 'set category'
         if 'item_name' in session['attributes']:
             item = session['attributes']['item_name'].capitalize()
             category = intent['slots']['Category']['value'].capitalize()
@@ -210,14 +192,45 @@ def set_category_in_session(intent, session):
     should_end_session = False
     reprompt_text = None
 
-#            session_attributes['next_task'] = 'set_location'
-#    else:
-#        ##TODO: best error msg?
+    return build_response(session_attributes, build_speechlet_response(
+        intent['name'], speech_output, reprompt_text, should_end_session))
 
+def get_recommendation_in_session(intent, session):
+    session_attributes = {}
+    reprompt_text = None
+    should_end_session = False
+
+    item = intent['slots']['Item']['value'].capitalize()
+    res = connection.get_recommendation(item)
+    speech_output = "I recommend you putting it on " + res + ". " \
+            "Do you want to put it there?"
+    session_attributes = {'next_task':'set_recommendation',\
+            'item_name' : item, 'location_name': res}
 
     return build_response(session_attributes, build_speechlet_response(
         intent['name'], speech_output, reprompt_text, should_end_session))
 
+def user_response_in_session(intent, session):
+    # case 1 : get recommendation -> yes
+    if 'next_task' in session['attributes']:
+        if session['attributes']['next_task'] == 'set_recommendation':
+            if intent['slots']['YesNo']['value'].startswith('yes'):
+                item = session['attributes']['item_name']
+                location = session['attributes']['location_name']
+                connection.set_location(item, location)
+                session_attributes = {}
+                speech_output = 'Item ' + item + ' is now located in ' + location
+                should_end_session = True
+                reprompt_text = None
+            if intent['slots']['YesNo']['value'].startswith('no'):
+                speech_output = "Choose another location by saying, " \
+                        "I want to put " + item + " on desk."
+                session_attributes = {'next_task':'set_location',\
+                        'item_name': item}
+                should_end_session = False
+                reprompt_text = None
+    return build_response(session_attributes, build_speechlet_response(
+        intent['name'], speech_output, reprompt_text, should_end_session))
 
 # --------------- Events ------------------
 
@@ -262,7 +275,11 @@ def on_intent(intent_request, session):
         return add_location_in_session(intent, session)
     if intent_name == "SetCategory":
         return set_category_in_session(intent, session)
-    # not using this intent
+    if intent_name == "GetRecommendation":
+        return get_recommendation_in_session(intent, session)
+    if intent_name == "UserResponse":
+        return user_response_in_session(intent, session)
+    #TODO:help intent! ex. browsing categories, locations, nfctag, nfcreader
     elif intent_name == "AMAZON.HelpIntent":
         return get_welcome_response()
     # not using this intent
@@ -314,5 +331,3 @@ def lambda_handler(event, context):
 
 
 
-#if __name__=='__main__':
-#    find_location('pencil')
