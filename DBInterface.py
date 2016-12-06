@@ -3,7 +3,7 @@ import time
 import boto3
 import os
 
-class Connection:
+class DBInterface:
     def __init__(self, conn_file):
         data = None
         with open(conn_file, 'r') as f:
@@ -132,7 +132,7 @@ class Connection:
         #TODO: check needed? how to check? have return code?
 
 if __name__ == "__main__":
-    conn = Connection('connection.txt')
+    conn = DBInterface('connection.txt')
     conn.iotconfig()
     res = conn.find_location('phone')
     res = conn.find_location_beep()

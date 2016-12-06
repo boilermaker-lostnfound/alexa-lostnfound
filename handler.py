@@ -8,12 +8,9 @@ http://amzn.to/1LGWsLG
 """
 
 from __future__ import print_function
-from dbtest import Connection
+from DBInterface import DBInterface
 
-#connection = None
-connection = Connection('connection.txt')
-# I know it's bad.. global variable for item
-global_item = ''
+connection = DBInterface('connection.txt')
 
 # --------------- Helpers that build all of the responses ----------------------
 
@@ -232,6 +229,10 @@ def user_response_in_session(intent, session):
     return build_response(session_attributes, build_speechlet_response(
         intent['name'], speech_output, reprompt_text, should_end_session))
 
+def package_test():
+    print('aa')
+    return None
+
 # --------------- Events ------------------
 
 def on_session_started(session_started_request, session):
@@ -330,4 +331,5 @@ def lambda_handler(event, context):
         return on_session_ended(event['request'], event['session'])
 
 
-
+if __name__ == '__main__':
+    package_test()
