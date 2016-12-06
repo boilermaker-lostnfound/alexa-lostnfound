@@ -12,6 +12,8 @@ from dbtest import Connection
 
 #connection = None
 connection = Connection('connection.txt')
+# I know it's bad.. global variable for item
+global_item = ''
 
 # --------------- Helpers that build all of the responses ----------------------
 
@@ -53,9 +55,9 @@ def get_welcome_response():
 
     session_attributes = {}
     card_title = "Welcome"
-    speech_output = "Welcome to Lost and Found. " \
-                    "Please ask me the location of your item by saying, " \
-                    "where is my laptop."
+    speech_output = "Welcome to Lost and Found. " #\
+                    #"Please ask me the location of your item by saying, " \
+                    #"where is my laptop."
     # If the user either does not reply to the welcome message or says something
     # that is not understood, they will be prompted again with this text.
     reprompt_text = "Please ask me the location of your item by saying, " \
@@ -74,6 +76,7 @@ def handle_session_end_request():
     return build_response({}, build_speechlet_response(
         card_title, speech_output, None, should_end_session))
 
+# not used.
 def literal_test_in_session(intent, session):
     session_attributes = {}
     should_end_session = True
@@ -94,6 +97,9 @@ def set_location_in_session(intent, session):
 
     item = intent['slots']['Item']['value']
     location = intent['slots']['Location']['value']
+#    if 'next_task' in session['attributes'] \
+#            and session['attributes']['next_task'] == 'set_location':
+#        item = session['attributes']['item_name']
     res = connection.set_location(item, location)
     speech_output = item + " is now located in " + location
     reprompt_text = None
@@ -132,7 +138,7 @@ def get_location_from_session(intent, session):
         should_end_session = True
         reprompt_text = None
         # TODO: right place to call the beeper? do we need thread?
-        connection.find_location_beep(item)
+        #connection.find_location_beep(item)
     else:
         # couldn't find it
         speech_output = res[1] # No item named 'item'. 
@@ -142,6 +148,73 @@ def get_location_from_session(intent, session):
     # Setting reprompt_text to None signifies that we do not want to reprompt
     # the user. If the user does not respond or says something that is not
     # understood, the session will end.
+    return build_response(session_attributes, build_speechlet_response(
+        intent['name'], speech_output, reprompt_text, should_end_session))
+
+def add_location_in_session(intent, session):
+    session_attributes = {}
+    should_end_session = True
+    reprompt_text = None
+    location = intent['slots']['Location']['value']
+    res = connection.add_new_location(location)
+    if res[0] == 1:
+        speech_output = "Location " + location + " was added to the database."
+    else:
+        speech_output = "Location " + location + " already exists."
+
+    return build_response(session_attributes, build_speechlet_response(
+        intent['name'], speech_output, reprompt_text, should_end_session))
+
+
+def add_item_in_session(intent, session):
+    session_attributes = {}
+    item = intent['slots']['Item']['value']
+    res = connection.add_new_item(item)
+    categories = connection.get_categories()
+    categories_str = ', '.join(categories)
+    if res[0] == 1:
+        speech_output = "Item " + item + " was added to the database. " \
+                        "What is the category? Please select a category among "\
+                        "Blah blah blah."
+                        #"%s." % categories_str
+        should_end_session = False
+        reprompt_text = None
+        session_attributes = {'next_task':'set_category', 'item_name': item}
+    else:
+        should_end_session = True
+        speech_output = "Item " + item + " already exists."
+        reprompt_text = None
+
+    return build_response(session_attributes, build_speechlet_response(
+        intent['name'], speech_output, reprompt_text, should_end_session))
+
+def set_category_in_session(intent, session):
+    #item = session_attributes['item_name']
+    if session['attributes']:
+        if 'item_name' in session['attributes']:
+            item = session['attributes']['item_name'].capitalize()
+            category = intent['slots']['Category']['value'].capitalize()
+            res = connection.set_category(item, category)
+            speech_output = "Item " + item + " is now stored in "+category+ \
+                            ". Where do you want to put this item? "\
+                            "Please say,for example, I want to put it on desk."
+            session_attributes={'next_task':'set_location', 'item_name': item}
+        else:
+            speech_output = 'session has attributes. but not item name'
+            # not sure attibutes should be {}
+            session_attributes = {}
+    else:
+        speech_output = 'session does not have attributes'
+        # not sure attibutes should be {}
+        session_attributes = {}
+    should_end_session = False
+    reprompt_text = None
+
+#            session_attributes['next_task'] = 'set_location'
+#    else:
+#        ##TODO: best error msg?
+
+
     return build_response(session_attributes, build_speechlet_response(
         intent['name'], speech_output, reprompt_text, should_end_session))
 
@@ -183,6 +256,12 @@ def on_intent(intent_request, session):
         return set_location_in_session(intent, session)
     if intent_name == "LiteralTest":
         return literal_test_in_session(intent, session)
+    if intent_name == "AddItem":
+        return add_item_in_session(intent, session)
+    if intent_name == "AddLocation":
+        return add_location_in_session(intent, session)
+    if intent_name == "SetCategory":
+        return set_category_in_session(intent, session)
     # not using this intent
     elif intent_name == "AMAZON.HelpIntent":
         return get_welcome_response()
@@ -221,7 +300,6 @@ def lambda_handler(event, context):
     #         "amzn1.echo-sdk-ams.app.[unique-value-here]"):
     #     raise ValueError("Invalid Application ID")
 
-    # TODO: Connection class
 
     if event['session']['new']:
         on_session_started({'requestId': event['request']['requestId']},

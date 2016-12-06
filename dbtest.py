@@ -29,7 +29,7 @@ class Connection:
     # return: (code, message to read)
     def find_location(self, item_name='Backpack'):
         item_name = item_name.capitalize()
-        # TODO: location with reader -> active==1 & timestamp-now < 5mins?
+        # TODO:
         # if nfctag is connected:
         #    if timestamp - now < 5mins: call beep(), return l.name
         #    else: return msg('the item was l.name t-now seconds ago. not now')
@@ -67,19 +67,35 @@ class Connection:
         timestamp = str(int(time.time()))
         location_name = location_name.capitalize()
         item_name = item_name.capitalize()
-        query = """MATCH (:Item{name:"%s"}) - [rel:LOCATED_AT] -> (:Location) SET rel.active=0
-        MERGE (item:Item{name:"%s"}) MERGE (location:Location{name:"%s"}) MERGE (item) - [r:LOCATED_AT { active:1, timestamp:%s}] -> (location)"""\
-                %(item_name, item_name, location_name, timestamp)
+        query ="""MERGE (item:Item{name:"%s"}) 
+        MERGE (location:Location{name:"%s"}) with item, location
+        optional MATCH (:Item{name:"%s"}) - [rel:LOCATED_AT] -> (:Location) 
+            SET rel.active=0 with item, location
+        MERGE (item) - [r:LOCATED_AT { active:1, timestamp:"%s"}] -> (location)
+        """ % (item_name, location_name, item_name, timestamp)
         results = self.gdb.query(query) # this query returns[]
-        print(results.elements)
 
     def add_new_location(self, location_name):
-        query = """MERGE (location:Location{name:"%s"})""" % location_name
+        location_name = location_name.capitalize()
+        query = """MATCH (l:Location {name:"%s"}) return l.name""" % location_name
         results = self.gdb.query(query)
+        if len(results) > 0:
+            return (-1, 'Already exists.')
+        else:
+            query = """MERGE (location:Location {name:"%s"})""" % location_name
+            results = self.gdb.query(query)
+            return (1, 'Succeeded. ')
 
     def add_new_item(self, item_name):
-        query = """MERGE (item:Item{name:"%s"})""" % item_name
+        item_name = item_name.capitalize()
+        query = """MATCH (item:Item {name:"%s"}) return item.name""" % item_name
         results = self.gdb.query(query)
+        if len(results) > 1: # Must TODO: should be 0
+            return (-1, 'Already exists.')
+        else:
+            query = """MERGE (item:Item {name:"%s"})""" % item_name
+            results = self.gdb.query(query)
+            return (1, 'Succeeded. ')
 
 #    #under developing
 #    def recommend_by_item:
@@ -98,12 +114,29 @@ class Connection:
 #        query = """  """
 #        results = self.gdb.query(query)
 
+    def get_categories(self):
+        query = """MATCH (c:Category) return c.name"""
+        results = self.gdb.query(query,returns=(str))
+        lst = [results[i][0] for i in range(len(results.elements))]
+        return lst
+
+    def set_category(self, item_name, category_name):
+        #TODO: DB constraints....!
+        category_name = category_name.capitalize()
+        item_name = item_name.capitalize()
+        query = """MATCH (i:Item {name: "%s"}) MERGE (c:Category {name: "%s"})
+            MERGE (i)-[h:HAS_CATEGORY]->(c)""" %(item_name, category_name)
+        results = self.gdb.query(query,returns=(str))
+        #TODO: check needed? how to check? have return code?
+
 if __name__ == "__main__":
     conn = Connection('connection.txt')
     conn.iotconfig()
-    res = conn.find_location('pencil')
+    #res = conn.find_location('pencil')
     #res = conn.find_location_beep()
     #conn.find_location_beep()
-
+#    lst=conn.get_categories()
+#    print lst
+#    print(', '.join(lst))
     #conn.set_location('Headphone', 'Bedroom Table')
-    
+    conn.set_category('Key', 'Electronics')
